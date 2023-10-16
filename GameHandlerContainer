@@ -1,0 +1,11 @@
+local handler = require(script:WaitForChild("GameHandler")).new()
+local module = {}
+
+function module.getHandler() 
+	if not handler then
+		warn("Handler has not been properly initialized. Likely because the handler module refuses to load")
+	end
+	return handler
+end
+
+return module
