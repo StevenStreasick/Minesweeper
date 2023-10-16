@@ -1,0 +1,190 @@
+--[[
+	Handles the camera object for the game
+]]
+
+local runService = game:GetService("RunService")
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local players = game:GetService("Players")
+
+local player = players.LocalPlayer
+local janitor = require(replicatedStorage.Janitor)
+local gameHandler = require(player.PlayerScripts.Scripts.Modules.Skeleton.GameHandlerContainer).getHandler()
+
+local camera = {
+	camera = game.Workspace.CurrentCamera
+}
+
+camera.__index = camera
+
+local axes = {
+	[Enum.Axis.X] = Vector3.xAxis,
+	[Enum.Axis.Y] = Vector3.yAxis,
+	[Enum.Axis.Z] = Vector3.zAxis
+}
+
+local validMovementKeys = {
+	[Enum.KeyCode.A] = Vector3.new(-1, 0, 0), 
+	[Enum.KeyCode.W] = Vector3.new(0, 1, 0), 
+	[Enum.KeyCode.D] = Vector3.new(1, 0, 0), 
+	[Enum.KeyCode.S] = Vector3.new(0, -1, 0)
+}
+
+local MOVEMENTSPEED = 16
+local OFFSET = 100
+local direction : Vector3 = Vector3.new(0, 0, 0)
+local freeAxis = Enum.Axis.Y
+
+local lowerbounds = game.Workspace.Grid.Lowerbounds.Position
+local upperbounds = game.Workspace.Grid.Upperbounds.Position
+
+
+--TODO: Rename this so that it becomes less confusing.
+--I have a bunch of properties that I could have a function that could update the camera so that it matches these properties.
+function moveCamera(deltaT) : boolean
+	if direction == Vector3.new(0,0,0) then
+		return false
+	end 
+
+	local camera = game.Workspace.CurrentCamera
+	local currentCFrame = camera.CFrame
+	local localChange = direction * MOVEMENTSPEED * deltaT
+
+	camera.CFrame = currentCFrame:ToWorldSpace(CFrame.new(localChange))
+
+	return true;
+
+end
+
+--[[
+	Creates a camera position so that an ariel view of the grid can be seen such that when 
+	the third dimension is squashed, the two remaining dimensions are visible.
+	@param
+	@return Vector3
+]]
+local function generateProjectionCenter() : Vector3
+	
+	local gridSize = upperbounds - lowerbounds
+	
+	local center = gridSize / 2 + lowerbounds
+	center += axes[freeAxis] * (gridSize / 2)
+	
+	return center
+	
+end
+--[[
+	Returns the number at the given axis in a given vector
+	@param vec The vector that needs to be read
+	@param axis The axis to read from
+	@return number
+]]
+local function getAxis(vec : Vector3, axis : Enum.Axis) : number
+	
+	if axis == Enum.Axis.X then
+		return vec.X
+	end
+	if axis == Enum.Axis.Y then
+		return vec.Y
+	end
+	if axis == Enum.Axis.Z then
+		return vec.Z
+	end
+	
+end
+
+local function getFOV() : number
+	local camCF = camera.camera.CFrame
+	local cameraPos = camCF.Position
+	local blue = camCF.LookVector.Unit
+	
+	local redEndPoint = axes[freeAxis]
+	redEndPoint *= math.clamp(
+		getAxis(cameraPos, freeAxis), 
+		getAxis(lowerbounds, freeAxis),
+		getAxis(upperbounds, freeAxis)
+	)
+	redEndPoint += lowerbounds
+		
+	local red = (redEndPoint - cameraPos).Unit;
+ 
+	local dotProduct = blue:Dot(red)
+
+	--Because it is getting the corner of the grid, it's actually a larger FOV than what it should be, but I don't care enough to properly fix this.
+	--Needs to be multiplied by two because otherwise, it would just be the angle between the center and the corner.
+
+	return math.deg(math.acos(dotProduct)) * 2 
+end
+local function lerpCamera(cam : Camera)
+	local boolean = false
+	local key = inputObject.KeyCode
+
+	for i, v in pairs (validMovementKeys) do
+		if i == key then
+			boolean = true
+		end
+	end
+
+	if not boolean then
+		return false
+	end
+
+	direction += validMovementKeys[key] * -(inputObject.UserInputState.Value - 1)
+	return true
+end
+
+local function slerpCamera(cam : Camera)
+	
+end
+
+--[[
+	Sets the camera in a way that makes the grid visible
+	@param
+	@return
+--]]
+function camera:setGridView()
+	self.camera.CameraType = Enum.CameraType.Scriptable
+	task.wait()
+	self.camera.CameraType = Enum.CameraType.Scriptable
+	
+	local center = generateProjectionCenter()
+	local camPos = center + axes[freeAxis] * OFFSET
+
+	self.camera.CFrame = CFrame.lookAt(camPos, center, Vector3.new(-1, 0, 0))
+	
+	self.camera.FieldOfView = getFOV()
+end
+
+function camera:UpdateMovement(inputObject : InputObject) : boolean
+	--TODO: Slerp the movement around. 
+
+	if inputObject.UserInputType == Enum.UserInputType.Keyboard then
+		if gameHandler:GetGame() == "3D" then
+			slerpCamera(self.camera)	
+			return true
+		end
+		lerpCamera(self.camera)
+		return true
+	end
+
+	warn("The input object is not currently supported within this freeCam module")
+
+	return false
+end 
+
+function camera.new() 
+	--By default, this script does not initialize itself by putting you into a 'grid view'
+	return setmetatable({
+		_keys = validMovementKeys,
+		_janitor = janitor.new()
+	}, camera)
+end
+
+function camera:Destroy()
+	if self._janitor then
+		self._janitor:Destroy()
+	end
+end
+
+runService.Heartbeat:Connect(moveCamera)
+
+
+return camera
