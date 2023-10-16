@@ -15,19 +15,20 @@ mine.__index = mine
 	@param
 	@return Mine
 --]]
-function mine:new()
-	local self = {}
+function mine.new()
 
-	local part = gridFolder.Center:Clone()
-	
-	setmetatable(self, mine)
-	self._janitor = Janitor.new()
-	self.Part = self._janitor:Add(part, "Destroy")
-	self.Bomb = false
-	self.isVisible = false
-	self.Neighbors = 0
-	self.Flagged = false
-	return self
+	local part = gridFolder.Lowerbounds:Clone()
+	local Janitor = Janitor.new()
+	return setmetatable({
+		_janitor = Janitor,
+		Part = Janitor:Add(part, "Destroy"),
+		Bomb = false,
+		isVisible = false,
+		Neighbors = 0,
+		Flagged = false
+		
+	} , mine)
+
 end
 --[[
 	Cleans up the mine object
@@ -36,6 +37,7 @@ end
 ]]
 function mine:Destroy()
 	local janitor = self._janitor
+	
 	if janitor then
 		janitor:Destroy()
 		self._janitor = nil
