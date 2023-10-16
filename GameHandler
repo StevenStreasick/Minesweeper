@@ -1,0 +1,75 @@
+local replicatedStorage = game.ReplicatedStorage
+
+local player = game.Players.LocalPlayer
+local modules = player.PlayerScripts.Scripts.Modules
+local worldInteractions = modules:WaitForChild("WorldInteraction")
+local grid = require(worldInteractions:WaitForChild("Grid"))
+
+local janitor = require(replicatedStorage.Janitor) 
+--TODO: Have the handler set grid view whenever a new game is started.
+
+local hand = {}
+hand.__index = hand
+
+local currentGame = nil
+
+local function setGridView()  : nil
+	
+end
+
+function hand:StopGame() : nil
+	self._janitor:Cleanup()
+end
+
+function hand:StartNewGame() 
+	self:StopGame()
+	return self._janitor:Add(grid.new(), "Destroy")
+end
+
+function hand:Start2D() 
+	currentGame = self:StartNewGame()	
+	
+	currentGame:squashThirdDimension()
+	
+	currentGame:placeCells()
+
+end
+
+function hand:Start3D()
+	currentGame = self:StartNewGame()	
+	currentGame:placeCells()
+end
+
+function hand:GetGame() : string
+	local size = currentGame:getSize()
+	
+	if size.Y > 1 then
+		return '3D'
+	end
+
+	return '2D'
+end
+
+function hand:FlagCell(position : Vector3) : boolean
+	local success, response = pcall(function() 
+		currentGame:FlagMine(position)
+		
+	end)
+	return success
+end
+
+function hand:RevealCell(position : Vector3) : boolean
+	local success, response = pcall(function() 
+		currentGame:uncoverMineAtMousePos(position)
+
+	end)
+	return success
+end
+
+function hand.new() 
+	return setmetatable({
+		_janitor = janitor.new()
+	}, hand)
+end
+
+return hand
